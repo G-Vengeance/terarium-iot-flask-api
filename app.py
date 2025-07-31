@@ -13,16 +13,14 @@ app.config['SQLALCHEMY_DATABASE_URI'] = uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-
+with app.app_context():
+    db.create_all()
 # Endpoint root untuk cek status server
 @app.route('/')
 def home():
     return "Terrarium API is running 🐍", 200
 
 # Buat tabel saat server pertama kali dijalankan
-@app.before_first_request
-def create_tables():
-    db.create_all()
 
 # --- Model database ---
 class SensorData(db.Model):
@@ -117,4 +115,6 @@ def get_historical_data(device_id):
 
 # --- Run lokal ---
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(host='0.0.0.0', port=5000, debug=True)
