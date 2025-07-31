@@ -2,8 +2,14 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import os
+from flask_cors import CORS
 
 app = Flask(__name__)
+
+# TAMBAHKAN KONFIGURASI CORS DI SINI
+CORS(app, resources={r"/*": {"origins": "*"}}) # Mengizinkan semua origin untuk semua path.
+# Jika Anda ingin lebih spesifik setelah ini berhasil, Anda bisa ganti "*" dengan URL Vercel Anda
+# Contoh: CORS(app, resources={r"/*": {"origins": "https://dsg-smart-reptile-iot.vercel.app"}})
 
 # Konfigurasi database
 uri = os.getenv("DATABASE_URL", "sqlite:///terarium_data.db")
@@ -11,6 +17,7 @@ if uri.startswith("postgres://"):
     uri = uri.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 
 db = SQLAlchemy(app)
 with app.app_context():
