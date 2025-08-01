@@ -1,26 +1,22 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate # TAMBAHKAN BARIS INI
 from datetime import datetime
 import os
-from flask_cors import CORS # Pastikan ini ada dan Flask-Cors sudah diinstal
+from flask_cors import CORS# Pastikan ini ada dan Flask-Cors sudah diinstal
 
-app = Flask(__name__)
+app = Flask(__name__) # <-- DIKOREKSI DARI 'aapp' MENJADI 'app'
 
-# Konfigurasi CORS: Mengizinkan semua origin untuk semua path.
-# Ini penting untuk komunikasi dengan frontend Anda di Vercel.
 CORS(app, resources={r"/*": {"origins": "*"}}) 
 
-# Konfigurasi database
-# Railway akan secara otomatis menyediakan variabel lingkungan DATABASE_URL
-# Jika tidak ada, fallback ke SQLite untuk pengembangan lokal
 uri = os.getenv("DATABASE_URL", "sqlite:///terarium_data.db")
-# Mengganti skema URL PostgreSQL lama ke yang baru jika diperlukan oleh SQLAlchemy
 if uri.startswith("postgres://"):
     uri = uri.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 # Inisialisasi database:
 # Panggil db.create_all() HANYA SEKALI, saat aplikasi dijalankan
