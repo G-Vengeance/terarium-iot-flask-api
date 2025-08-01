@@ -2,32 +2,36 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import os
-from flask_cors import CORS
+from flask_cors import CORS # Pastikan ini ada dan Flask-Cors sudah diinstal
 
 app = Flask(__name__)
 
-# TAMBAHKAN KONFIGURASI CORS DI SINI
-CORS(app, resources={r"/*": {"origins": "*"}}) # Mengizinkan semua origin untuk semua path.
-# Jika Anda ingin lebih spesifik setelah ini berhasil, Anda bisa ganti "*" dengan URL Vercel Anda
-# Contoh: CORS(app, resources={r"/*": {"origins": "https://dsg-smart-reptile-iot.vercel.app"}})
+# Konfigurasi CORS: Mengizinkan semua origin untuk semua path.
+# Ini penting untuk komunikasi dengan frontend Anda di Vercel.
+CORS(app, resources={r"/*": {"origins": "*"}}) 
 
 # Konfigurasi database
+# Railway akan secara otomatis menyediakan variabel lingkungan DATABASE_URL
+# Jika tidak ada, fallback ke SQLite untuk pengembangan lokal
 uri = os.getenv("DATABASE_URL", "sqlite:///terarium_data.db")
+# Mengganti skema URL PostgreSQL lama ke yang baru jika diperlukan oleh SQLAlchemy
 if uri.startswith("postgres://"):
     uri = uri.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-
 db = SQLAlchemy(app)
-with app.app_context():
-    db.create_all()
+
+# Inisialisasi database:
+# Panggil db.create_all() HANYA SEKALI, saat aplikasi dijalankan
+# Ini akan membuat tabel jika belum ada.
+# Untuk deployment di Railway, ini akan dijalankan saat Gunicorn start.
+# Untuk lokal, ini akan dijalankan saat __name__ == '__main__'.
+
 # Endpoint root untuk cek status server
 @app.route('/')
 def home():
     return "Terrarium API is running 🐍", 200
-
-# Buat tabel saat server pertama kali dijalankan
 
 # --- Model database ---
 class SensorData(db.Model):
@@ -80,8 +84,13 @@ def get_commands():
 
     command_entry = DeviceCommand.query.filter_by(device_id=device_id).first()
     if command_entry and command_entry.command:
-        print(f"[{datetime.now()}] Sending command '{command_entry.command}' to {device_id}")
-        return jsonify({"command": command_entry.command}), 200
+        # Perintah akan dikirim ke NodeMCU, lalu bisa dihapus dari DB jika hanya sekali pakai
+        # Untuk skripsi, bisa dibiarkan agar bisa di-polling berkali-kali sampai diganti
+        command_to_send = command_entry.command
+        # command_entry.command = None # Opsional: jika command hanya untuk sekali pakai
+        # db.session.commit() # Opsional: jika command hanya untuk sekali pakai
+        print(f"[{datetime.now()}] Sending command '{command_to_send}' to {device_id}")
+        return jsonify({"command": command_to_send}), 200
     return jsonify({"command": None}), 200
 
 # --- API untuk kontrol command dari dashboard ---
@@ -117,11 +126,13 @@ def get_latest_data(device_id):
 # --- API untuk historical data ---
 @app.route('/api/v1/historical_data/<device_id>', methods=['GET'])
 def get_historical_data(device_id):
+    # Ambil 100 data terakhir sebagai contoh, Anda bisa menambahkan parameter limit/offset
     data = SensorData.query.filter_by(device_id=device_id).order_by(SensorData.timestamp.desc()).limit(100).all()
     return jsonify([d.to_dict() for d in data]), 200
 
-# --- Run lokal ---
+# --- Run aplikasi (Untuk pengembangan lokal) ---
 if __name__ == '__main__':
+    # Pastikan database dibuat saat aplikasi dijalankan secara lokal
     with app.app_context():
         db.create_all()
     app.run(host='0.0.0.0', port=5000, debug=True)
